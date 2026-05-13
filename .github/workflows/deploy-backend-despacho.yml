@@ -1,6 +1,5 @@
-# EP2 — CI/CD: build Docker, push a ECR y despliegue en EC2 al hacer push a `deploy`.
-# Prerrequisitos en EC2: Docker, AWS CLI y rol IAM con permisos de lectura en ECR (GetAuthorizationToken + pull).
-# Si el repositorio GitHub es solo esta carpeta (sin monorepo), elimina `paths` y ajusta `context` a `.`
+# EP2 — CI/CD: build Docker, push a ECR y despliegue en EC2 (rama deploy).
+# Este archivo debe vivir en la raíz del repo: https://github.com/IgnacioLondono/Innovatech
 
 name: Deploy backend (Docker + ECR + EC2)
 
@@ -9,6 +8,7 @@ on:
     branches: [deploy]
     paths:
       - "back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/**"
+      - ".github/workflows/deploy-backend-despacho.yml"
 
 permissions:
   contents: read

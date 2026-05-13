@@ -1,5 +1,5 @@
-# EP2 — CI/CD para el frontend (build estático + nginx, ECR, EC2).
-# Si el repo es solo `front_despacho`, quita `paths` y pon `context: .`
+# EP2 — CI/CD frontend (rama deploy).
+# Repo: https://github.com/IgnacioLondono/Innovatech
 
 name: Deploy frontend (Docker + ECR + EC2)
 
@@ -8,6 +8,7 @@ on:
     branches: [deploy]
     paths:
       - "front_despacho/**"
+      - ".github/workflows/deploy-frontend.yml"
 
 permissions:
   contents: read

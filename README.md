@@ -1,5 +1,7 @@
 # Proyecto semestral — Innovatech (DevOps EP2)
 
+Repositorio remoto: [https://github.com/IgnacioLondono/Innovatech](https://github.com/IgnacioLondono/Innovatech)
+
 Monorepo con **frontend** (`front_despacho`), **API ventas** y **API despachos**. Para la evaluación parcial 2 se prioriza el par **front + API despachos**; el API de ventas sigue siendo necesaria para las pantallas que listan compras.
 
 ## Arranque rápido (stack completo en Docker)
@@ -37,6 +39,10 @@ Si entregas **dos** repositorios Git como pide el encargo:
 1. Copia `front_despacho/` a un repo y ajusta el workflow (quita `paths`, `context: .`).
 2. Copia `back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/` a otro repo y haz lo mismo.
 3. Mantén el API de ventas accesible desde el front (otro contenedor, otra EC2 o misma red privada) según tu diseño en AWS.
+
+## GitHub Actions (CI/CD)
+
+Los workflows activos están en **la raíz del repo**: `.github/workflows/` (`deploy-frontend.yml` y `deploy-backend-despacho.yml`). Se ejecutan con **push a la rama `deploy`**. Configura los **Secrets** en GitHub (Settings → Secrets and variables → Actions). Detalle en `DEPLOY-AWS.md`.
 
 ## Documentación por componente
 

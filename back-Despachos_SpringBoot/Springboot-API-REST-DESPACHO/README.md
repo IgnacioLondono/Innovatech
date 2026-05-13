@@ -49,7 +49,7 @@ docker run --rm -p 8081:8081 \
 
 ## CI/CD (GitHub Actions)
 
-El workflow `.github/workflows/deploy.yml` se dispara con **push a la rama `deploy`**.
+En el monorepo **Innovatech**, el workflow está en la raíz: `.github/workflows/deploy-backend-despacho.yml`. Se dispara con **push a la rama `deploy`**.
 
 1. Autenticación en AWS (access key del laboratorio o método que permita tu docente).
 2. Login en **Amazon ECR**, build de la imagen y push (`:latest` y `:SHA`).
@@ -61,6 +61,7 @@ El workflow `.github/workflows/deploy.yml` se dispara con **push a la rama `depl
 |--------|-----|
 | `AWS_ACCESS_KEY_ID` | Credenciales AWS para el runner |
 | `AWS_SECRET_ACCESS_KEY` | |
+| `AWS_SESSION_TOKEN` | Solo si usas credenciales temporales (Learner Lab) |
 | `AWS_REGION` | Región (ej. `us-east-1`) |
 | `ECR_REPOSITORY_BACKEND` | Nombre del repositorio en ECR |
 | `EC2_BACKEND_HOST` | IP o DNS público de la EC2 backend |

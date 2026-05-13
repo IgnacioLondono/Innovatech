@@ -52,7 +52,7 @@ En el repositorio padre, `docker compose up` construye el front con `NGINX_CONF=
 
 ## CI/CD (rama `deploy`)
 
-Archivo: `.github/workflows/deploy.yml`
+En el monorepo **Innovatech**, el workflow está en la raíz del repositorio: `.github/workflows/deploy-frontend.yml` (no dentro de `front_despacho/`).
 
 1. Build de la imagen Docker y push a **Amazon ECR**.
 2. SSH a la **EC2 del frontend**, `docker pull` y contenedor en el puerto **80** → **8080** interno.

@@ -173,12 +173,14 @@ Usa el endpoint de RDS en `DB_ENDPOINT`, puerto `3306`, y los secretos que defin
 | `VITE_API_DESPACHOS_URL` | URL que el **navegador** usará para llamar al API despachos (ej. `http://IP_PUBLICA_BACK:8081` solo si abres el puerto; mejor: proxy en el front — Parte F) |
 | `VITE_API_VENTAS_URL` | Igual para ventas (`http://...:8080`) |
 
-Haz **push a `deploy`** solo cuando los secrets estén listos. Los workflows están en:
+Haz **push a `deploy`** solo cuando los secrets estén listos. Los workflows activos están **solo en la raíz** del repositorio (GitHub no ejecuta YAML en subcarpetas):
 
-- `front_despacho/.github/workflows/deploy.yml`
-- `back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/.github/workflows/deploy.yml`
+- `.github/workflows/deploy-frontend.yml`
+- `.github/workflows/deploy-backend-despacho.yml`
 
-Si tu GitHub es **solo una carpeta** del monorepo, edita cada workflow: quita `paths:` y cambia `context` del build a `.`.
+Repo de ejemplo: [IgnacioLondono/Innovatech](https://github.com/IgnacioLondono/Innovatech).
+
+Si en el futuro separas **solo una carpeta** en otro repo, mueve el YAML correspondiente a `.github/workflows/` de ese repo, quita `paths:` y pon `context: .` en el paso de build.
 
 ---
 
