@@ -1,0 +1,72 @@
+# EP2 — CI/CD para el frontend (build estático + nginx, ECR, EC2).
+# Si el repo es solo `front_despacho`, quita `paths` y pon `context: .`
+
+name: Deploy frontend (Docker + ECR + EC2)
+
+on:
+  push:
+    branches: [deploy]
+    paths:
+      - "front_despacho/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY_FRONTEND }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./front_despacho
+          build-args: |
+            NGINX_CONF=standalone
+            VITE_API_DESPACHOS_URL=${{ secrets.VITE_API_DESPACHOS_URL }}
+            VITE_API_VENTAS_URL=${{ secrets.VITE_API_VENTAS_URL }}
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Desplegar en EC2 (SSH)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPO: ${{ env.ECR_REPOSITORY }}
+          AWS_REG: ${{ secrets.AWS_REGION }}
+        with:
+          host: ${{ secrets.EC2_FRONTEND_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: REGISTRY,REPO,AWS_REG
+          script: |
+            set -e
+            aws ecr get-login-password --region "$AWS_REG" | docker login --username AWS --password-stdin "$REGISTRY"
+            docker pull "$REGISTRY/$REPO:latest"
+            docker stop frontend 2>/dev/null || true
+            docker rm frontend 2>/dev/null || true
+            docker run -d --name frontend --restart unless-stopped \
+              -p 80:8080 \
+              "$REGISTRY/$REPO:latest"

@@ -1,0 +1,65 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-innovatech}
+      MYSQL_USER: ${DB_USERNAME:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-apppass}
+    volumes:
+      mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 8s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  ventas-api:
+    build:
+      context: ./back-Ventas_SpringBoot/Springboot-API-REST
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-innovatech}
+      DB_USERNAME: ${DB_USERNAME:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  despacho-api:
+    build:
+      context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-innovatech}
+      DB_USERNAME: ${DB_USERNAME:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./front_despacho
+      dockerfile: Dockerfile
+      args:
+        NGINX_CONF: stack
+        VITE_API_DESPACHOS_URL: ""
+        VITE_API_VENTAS_URL: ""
+    restart: unless-stopped
+    ports:
+      - "${FRONT_PORT:-80}:8080"
+    depends_on:
+      - ventas-api
+      - despacho-api
+
+volumes:
+  mysql_data:

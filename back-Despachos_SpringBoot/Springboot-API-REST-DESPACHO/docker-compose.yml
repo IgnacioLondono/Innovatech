@@ -1,0 +1,38 @@
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-innovatech}
+      MYSQL_USER: ${DB_USERNAME:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-apppass}
+    ports:
+      - "${MYSQL_PUBLISH_PORT:-3306}:3306"
+    volumes:
+      # Named volume: Docker gestiona la ruta; portable y adecuado para datos de BD (vs bind mount típico en dev para código).
+      mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 8s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8081}:8081"
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-innovatech}
+      DB_USERNAME: ${DB_USERNAME:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
