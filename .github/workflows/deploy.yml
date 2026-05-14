@@ -1,4 +1,5 @@
 # Rama deploy: build/push a Docker Hub → EC2 back (MySQL + APIs) y EC2 front (SPA) por separado.
+# SSH: front y back pueden usar llaves distintas (EC2_SSH_KEY_FRONT / EC2_SSH_KEY_BACK).
 
 name: Deploy stack (Docker Hub + EC2 front/back)
 
@@ -76,7 +77,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_BACK }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY_BACK }}
           source: "deploy-bundle-back/docker-compose.yml"
           target: "/home/ec2-user/proyecto/"
           overwrite: true
@@ -95,7 +96,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_BACK }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY_BACK }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
           script: |
             set -eo pipefail
@@ -147,7 +148,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_FRONT }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY_FRONT }}
           source: "deploy-bundle-front/docker-compose.yml"
           target: "/home/ec2-user/proyecto/"
           overwrite: true
@@ -161,7 +162,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_HOST_FRONT }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          key: ${{ secrets.EC2_SSH_KEY_FRONT }}
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
           script: |
             set -eo pipefail
