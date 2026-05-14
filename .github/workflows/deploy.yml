@@ -1,5 +1,6 @@
 # Rama deploy: build/push a Docker Hub → EC2 back (MySQL + APIs) y EC2 front (SPA) por separado.
 # SSH: front y back pueden usar llaves distintas (EC2_SSH_KEY_FRONT / EC2_SSH_KEY_BACK).
+# EC2: backend suele ser Amazon Linux (dnf); frontend a menudo es Ubuntu (apt).
 
 name: Deploy stack (Docker Hub + EC2 front/back)
 
@@ -12,25 +13,27 @@ permissions:
 
 env:
   IMAGE_TAG: latest
+  # Mitiga avisos de deprecación Node 20 en el runner hasta que todas las actions usen Node 24.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push — API Ventas
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./back-Ventas_SpringBoot/Springboot-API-REST
           push: true
@@ -39,7 +42,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-ventas-api:${{ env.IMAGE_TAG }}
 
       - name: Build and push — API Despacho
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
           push: true
@@ -48,7 +51,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-despacho-api:${{ env.IMAGE_TAG }}
 
       - name: Build and push — Frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./front_despacho
           build-args: |
@@ -65,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Preparar docker-compose.yml (back)
         run: |
@@ -79,12 +82,13 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY_BACK }}
           source: "deploy-bundle-back/docker-compose.yml"
-          target: "/home/ec2-user/proyecto/"
+          target: "/home/${{ secrets.EC2_USER }}/proyecto/"
           overwrite: true
 
       - name: Desplegar stack back (SSH)
         uses: appleboy/ssh-action@v1.2.0
         env:
+          DEPLOY_DIR: /home/${{ secrets.EC2_USER }}/proyecto
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
@@ -97,14 +101,23 @@ jobs:
           host: ${{ secrets.EC2_HOST_BACK }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY_BACK }}
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
+          envs: DEPLOY_DIR,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
           script: |
             set -eo pipefail
-            sudo dnf install -y docker docker-compose-plugin
-            sudo systemctl enable --now docker
+            if command -v dnf >/dev/null 2>&1; then
+              sudo dnf install -y docker docker-compose-plugin
+            elif command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2
+            else
+              echo "No se encontró dnf ni apt-get"; exit 1
+            fi
+            sudo systemctl enable docker 2>/dev/null || true
+            sudo systemctl start docker
+            sudo docker compose version
 
-            mkdir -p /home/ec2-user/proyecto
-            cd /home/ec2-user/proyecto
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
             MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-rootpass}"
             DB_NAME="${DB_NAME:-innovatech}"
@@ -134,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Preparar docker-compose.yml (front)
         run: |
@@ -148,12 +161,13 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY_FRONT }}
           source: "deploy-bundle-front/docker-compose.yml"
-          target: "/home/ec2-user/proyecto/"
+          target: "/home/${{ secrets.EC2_USER }}/proyecto/"
           overwrite: true
 
       - name: Desplegar stack front (SSH)
         uses: appleboy/ssh-action@v1.2.0
         env:
+          DEPLOY_DIR: /home/${{ secrets.EC2_USER }}/proyecto
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           FRONT_PORT: ${{ secrets.FRONT_PORT }}
@@ -161,14 +175,23 @@ jobs:
           host: ${{ secrets.EC2_HOST_FRONT }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY_FRONT }}
-          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
+          envs: DEPLOY_DIR,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
           script: |
             set -eo pipefail
-            sudo dnf install -y docker docker-compose-plugin
-            sudo systemctl enable --now docker
+            if command -v dnf >/dev/null 2>&1; then
+              sudo dnf install -y docker docker-compose-plugin
+            elif command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2
+            else
+              echo "No se encontró dnf ni apt-get"; exit 1
+            fi
+            sudo systemctl enable docker 2>/dev/null || true
+            sudo systemctl start docker
+            sudo docker compose version
 
-            mkdir -p /home/ec2-user/proyecto
-            cd /home/ec2-user/proyecto
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
             FRONT_PORT="${FRONT_PORT:-80}"
 
