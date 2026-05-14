@@ -1,7 +1,12 @@
 # syntax=docker/dockerfile:1
+# Multi-stage: Maven compila en builder; imagen final solo con JRE, usuario no root.
+
 FROM maven:3.9.9-eclipse-temurin-17-alpine AS builder
 WORKDIR /app
+
 COPY pom.xml .
+RUN mvn -B -DskipTests dependency:go-offline
+
 COPY src ./src
 RUN mvn -B -DskipTests package
 
@@ -10,8 +15,7 @@ WORKDIR /app
 
 RUN addgroup -S spring && adduser -S spring -G spring
 
-COPY --from=builder /app/target/*.jar /app/app.jar
-RUN chown spring:spring /app/app.jar
+COPY --from=builder --chown=spring:spring /app/target/*.jar /app/app.jar
 
 USER spring:spring
 EXPOSE 8080

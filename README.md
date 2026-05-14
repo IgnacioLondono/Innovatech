@@ -42,7 +42,7 @@ Si entregas **dos** repositorios Git como pide el encargo:
 
 ## GitHub Actions (CI/CD)
 
-Los workflows activos están en **la raíz del repo**: `.github/workflows/` (`deploy-frontend.yml` y `deploy-backend-despacho.yml`). Se ejecutan con **push a la rama `deploy`**. Configura los **Secrets** en GitHub (Settings → Secrets and variables → Actions). Detalle en `DEPLOY-AWS.md`.
+Los workflows activos están en **la raíz del repo**: `.github/workflows/` (`deploy-frontend.yml` y `deploy-backend-despacho.yml`). Se ejecutan con **push a la rama `deploy`**. Configura los **Secrets** en GitHub (Settings → Secrets and variables → Actions). Detalle en `DEPLOY-AWS.md`. Para el **informe escrito** del EP2 usa la plantilla `INFORME-EP2-plantilla.md` (cópiala a Word o Google Docs).
 
 ## Documentación por componente
 

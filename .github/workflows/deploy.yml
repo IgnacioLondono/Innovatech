@@ -1,0 +1,187 @@
+# Rama deploy: build/push a Docker Hub → EC2 back (MySQL + APIs) y EC2 front (SPA) por separado.
+
+name: Deploy stack (Docker Hub + EC2 front/back)
+
+on:
+  push:
+    branches: [deploy]
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: latest
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push — API Ventas
+        uses: docker/build-push-action@v6
+        with:
+          context: ./back-Ventas_SpringBoot/Springboot-API-REST
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-ventas-api:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-ventas-api:${{ env.IMAGE_TAG }}
+
+      - name: Build and push — API Despacho
+        uses: docker/build-push-action@v6
+        with:
+          context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-despacho-api:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-despacho-api:${{ env.IMAGE_TAG }}
+
+      - name: Build and push — Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./front_despacho
+          build-args: |
+            NGINX_CONF=standalone
+            VITE_API_DESPACHOS_URL=${{ secrets.VITE_API_DESPACHOS_URL }}
+            VITE_API_VENTAS_URL=${{ secrets.VITE_API_VENTAS_URL }}
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/innovatech-frontend:${{ env.IMAGE_TAG }}
+
+  deploy-backend:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar docker-compose.yml (back)
+        run: |
+          mkdir -p deploy-bundle-back
+          cp docker-compose.back.deploy.yml deploy-bundle-back/docker-compose.yml
+
+      - name: Copiar compose al EC2 back (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST_BACK }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          source: "deploy-bundle-back/docker-compose.yml"
+          target: "/home/ec2-user/proyecto/"
+          overwrite: true
+
+      - name: Desplegar stack back (SSH)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          VENTAS_API_HOST_PORT: ${{ secrets.VENTAS_API_HOST_PORT }}
+          DESPACHO_API_HOST_PORT: ${{ secrets.DESPACHO_API_HOST_PORT }}
+        with:
+          host: ${{ secrets.EC2_HOST_BACK }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
+          script: |
+            set -eo pipefail
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf install -y docker docker-compose-plugin
+              sudo systemctl enable --now docker
+            fi
+
+            mkdir -p /home/ec2-user/proyecto
+            cd /home/ec2-user/proyecto
+
+            MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-rootpass}"
+            DB_NAME="${DB_NAME:-innovatech}"
+            DB_USERNAME="${DB_USERNAME:-app}"
+            DB_PASSWORD="${DB_PASSWORD:-apppass}"
+            VENTAS_API_HOST_PORT="${VENTAS_API_HOST_PORT:-8080}"
+            DESPACHO_API_HOST_PORT="${DESPACHO_API_HOST_PORT:-8081}"
+
+            {
+              echo "DOCKERHUB_NAMESPACE=${DOCKERHUB_USERNAME}"
+              echo "IMAGE_TAG=latest"
+              echo "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}"
+              echo "DB_NAME=${DB_NAME}"
+              echo "DB_USERNAME=${DB_USERNAME}"
+              echo "DB_PASSWORD=${DB_PASSWORD}"
+              echo "VENTAS_API_HOST_PORT=${VENTAS_API_HOST_PORT}"
+              echo "DESPACHO_API_HOST_PORT=${DESPACHO_API_HOST_PORT}"
+            } > .env
+
+            echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+            sudo docker compose --env-file .env pull
+            sudo docker compose --env-file .env up -d
+
+  deploy-frontend:
+    needs: build-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Preparar docker-compose.yml (front)
+        run: |
+          mkdir -p deploy-bundle-front
+          cp docker-compose.front.deploy.yml deploy-bundle-front/docker-compose.yml
+
+      - name: Copiar compose al EC2 front (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST_FRONT }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          source: "deploy-bundle-front/docker-compose.yml"
+          target: "/home/ec2-user/proyecto/"
+          overwrite: true
+
+      - name: Desplegar stack front (SSH)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          FRONT_PORT: ${{ secrets.FRONT_PORT }}
+        with:
+          host: ${{ secrets.EC2_HOST_FRONT }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
+          script: |
+            set -eo pipefail
+            if ! command -v docker >/dev/null 2>&1; then
+              sudo dnf install -y docker docker-compose-plugin
+              sudo systemctl enable --now docker
+            fi
+
+            mkdir -p /home/ec2-user/proyecto
+            cd /home/ec2-user/proyecto
+
+            FRONT_PORT="${FRONT_PORT:-80}"
+
+            {
+              echo "DOCKERHUB_NAMESPACE=${DOCKERHUB_USERNAME}"
+              echo "IMAGE_TAG=latest"
+              echo "FRONT_PORT=${FRONT_PORT}"
+            } > .env
+
+            echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+            sudo docker compose --env-file .env pull
+            sudo docker compose --env-file .env up -d

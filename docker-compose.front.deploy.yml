@@ -1,0 +1,13 @@
+# Solo frontend (nginx) para EC2_FRONT. Despliegue en EC2_HOST_FRONT.
+# Variables en /home/ec2-user/proyecto/.env:
+#   DOCKERHUB_NAMESPACE, IMAGE_TAG, FRONT_PORT
+#
+# La imagen debe construirse en CI con las URLs reales de las APIs del EC2 back
+# (VITE_API_*), porque el navegador del usuario llama al host del front, no al del back.
+
+services:
+  frontend:
+    image: ${DOCKERHUB_NAMESPACE}/innovatech-frontend:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${FRONT_PORT:-80}:8080"

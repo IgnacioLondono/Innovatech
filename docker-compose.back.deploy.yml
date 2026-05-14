@@ -1,0 +1,55 @@
+# Backend + MySQL para EC2 (solo imágenes Docker Hub). Despliegue en EC2_HOST_BACK.
+# Variables en /home/ec2-user/proyecto/.env:
+#   DOCKERHUB_NAMESPACE, IMAGE_TAG
+#   MYSQL_ROOT_PASSWORD, DB_NAME, DB_USERNAME, DB_PASSWORD
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-innovatech}
+      MYSQL_USER: ${DB_USERNAME:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-apppass}
+    volumes:
+      mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 8s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  ventas-api:
+    image: ${DOCKERHUB_NAMESPACE}/innovatech-ventas-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-innovatech}
+      DB_USERNAME: ${DB_USERNAME:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+    ports:
+      - "${VENTAS_API_HOST_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  despacho-api:
+    image: ${DOCKERHUB_NAMESPACE}/innovatech-despacho-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-innovatech}
+      DB_USERNAME: ${DB_USERNAME:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-apppass}
+    ports:
+      - "${DESPACHO_API_HOST_PORT:-8081}:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
