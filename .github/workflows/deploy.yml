@@ -105,15 +105,33 @@ jobs:
           script: |
             set -eo pipefail
             if command -v dnf >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin
+              sudo dnf install -y docker docker-compose-plugin curl
             elif command -v apt-get >/dev/null 2>&1; then
               sudo apt-get update -y
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl docker.io
+              sudo apt-get remove -y docker-compose-v2 docker-compose-plugin 2>/dev/null || true
             else
               echo "No se encontró dnf ni apt-get"; exit 1
             fi
             sudo systemctl enable docker 2>/dev/null || true
             sudo systemctl start docker
+
+            overlay_docker_compose_plugin() {
+              ARCH=$(uname -m)
+              case "$ARCH" in
+                x86_64) DL_ARCH=x86_64 ;;
+                aarch64|arm64) DL_ARCH=aarch64 ;;
+                *) echo "Arquitectura no soportada: $ARCH"; exit 1 ;;
+              esac
+              COMPOSE_VER="v2.35.1"
+              URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER}/docker-compose-linux-${DL_ARCH}"
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              TMP="$(mktemp)"
+              curl -fsSL "$URL" -o "$TMP"
+              sudo install -m0755 "$TMP" /usr/local/lib/docker/cli-plugins/docker-compose
+              rm -f "$TMP"
+            }
+            overlay_docker_compose_plugin
             sudo docker compose version
 
             mkdir -p "$DEPLOY_DIR"
@@ -179,15 +197,33 @@ jobs:
           script: |
             set -eo pipefail
             if command -v dnf >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin
+              sudo dnf install -y docker docker-compose-plugin curl
             elif command -v apt-get >/dev/null 2>&1; then
               sudo apt-get update -y
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io docker-compose-v2
+              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl docker.io
+              sudo apt-get remove -y docker-compose-v2 docker-compose-plugin 2>/dev/null || true
             else
               echo "No se encontró dnf ni apt-get"; exit 1
             fi
             sudo systemctl enable docker 2>/dev/null || true
             sudo systemctl start docker
+
+            overlay_docker_compose_plugin() {
+              ARCH=$(uname -m)
+              case "$ARCH" in
+                x86_64) DL_ARCH=x86_64 ;;
+                aarch64|arm64) DL_ARCH=aarch64 ;;
+                *) echo "Arquitectura no soportada: $ARCH"; exit 1 ;;
+              esac
+              COMPOSE_VER="v2.35.1"
+              URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER}/docker-compose-linux-${DL_ARCH}"
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              TMP="$(mktemp)"
+              curl -fsSL "$URL" -o "$TMP"
+              sudo install -m0755 "$TMP" /usr/local/lib/docker/cli-plugins/docker-compose
+              rm -f "$TMP"
+            }
+            overlay_docker_compose_plugin
             sudo docker compose version
 
             mkdir -p "$DEPLOY_DIR"
