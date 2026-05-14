@@ -100,10 +100,8 @@ jobs:
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
           script: |
             set -eo pipefail
-            if ! command -v docker >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin
-              sudo systemctl enable --now docker
-            fi
+            sudo dnf install -y docker docker-compose-plugin
+            sudo systemctl enable --now docker
 
             mkdir -p /home/ec2-user/proyecto
             cd /home/ec2-user/proyecto
@@ -128,8 +126,8 @@ jobs:
 
             echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
-            sudo docker compose --env-file .env pull
-            sudo docker compose --env-file .env up -d
+            sudo docker compose pull
+            sudo docker compose up -d
 
   deploy-frontend:
     needs: build-push
@@ -166,10 +164,8 @@ jobs:
           envs: DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
           script: |
             set -eo pipefail
-            if ! command -v docker >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin
-              sudo systemctl enable --now docker
-            fi
+            sudo dnf install -y docker docker-compose-plugin
+            sudo systemctl enable --now docker
 
             mkdir -p /home/ec2-user/proyecto
             cd /home/ec2-user/proyecto
@@ -184,5 +180,5 @@ jobs:
 
             echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
-            sudo docker compose --env-file .env pull
-            sudo docker compose --env-file .env up -d
+            sudo docker compose pull
+            sudo docker compose up -d
