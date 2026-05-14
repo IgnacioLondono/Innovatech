@@ -1,6 +1,6 @@
 # Rama deploy: build/push a Docker Hub → EC2 back (MySQL + APIs) y EC2 front (SPA) por separado.
 # SSH: front y back pueden usar llaves distintas (EC2_SSH_KEY_FRONT / EC2_SSH_KEY_BACK).
-# EC2: backend suele ser Amazon Linux (dnf); frontend a menudo es Ubuntu (apt).
+# En cada EC2 debe existir Docker y el binario /usr/local/bin/docker-compose (sin instalar desde CI).
 
 name: Deploy stack (Docker Hub + EC2 front/back)
 
@@ -104,35 +104,7 @@ jobs:
           envs: DEPLOY_DIR,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,MYSQL_ROOT_PASSWORD,DB_NAME,DB_USERNAME,DB_PASSWORD,VENTAS_API_HOST_PORT,DESPACHO_API_HOST_PORT
           script: |
             set -eo pipefail
-            if command -v dnf >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin curl
-            elif command -v apt-get >/dev/null 2>&1; then
-              sudo apt-get update -y
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl docker.io
-              sudo apt-get remove -y docker-compose-v2 docker-compose-plugin 2>/dev/null || true
-            else
-              echo "No se encontró dnf ni apt-get"; exit 1
-            fi
-            sudo systemctl enable docker 2>/dev/null || true
-            sudo systemctl start docker
-
-            overlay_docker_compose_plugin() {
-              ARCH=$(uname -m)
-              case "$ARCH" in
-                x86_64) DL_ARCH=x86_64 ;;
-                aarch64|arm64) DL_ARCH=aarch64 ;;
-                *) echo "Arquitectura no soportada: $ARCH"; exit 1 ;;
-              esac
-              COMPOSE_VER="v2.35.1"
-              URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER}/docker-compose-linux-${DL_ARCH}"
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              TMP="$(mktemp)"
-              curl -fsSL "$URL" -o "$TMP"
-              sudo install -m0755 "$TMP" /usr/local/lib/docker/cli-plugins/docker-compose
-              rm -f "$TMP"
-            }
-            overlay_docker_compose_plugin
-            sudo docker compose version
+            COMPOSE="/usr/local/bin/docker-compose"
 
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
@@ -155,10 +127,10 @@ jobs:
               echo "DESPACHO_API_HOST_PORT=${DESPACHO_API_HOST_PORT}"
             } > .env
 
-            echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
-            sudo docker compose pull
-            sudo docker compose up -d
+            "$COMPOSE" pull
+            "$COMPOSE" up -d
 
   deploy-frontend:
     needs: build-push
@@ -196,35 +168,7 @@ jobs:
           envs: DEPLOY_DIR,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,FRONT_PORT
           script: |
             set -eo pipefail
-            if command -v dnf >/dev/null 2>&1; then
-              sudo dnf install -y docker docker-compose-plugin curl
-            elif command -v apt-get >/dev/null 2>&1; then
-              sudo apt-get update -y
-              sudo DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates curl docker.io
-              sudo apt-get remove -y docker-compose-v2 docker-compose-plugin 2>/dev/null || true
-            else
-              echo "No se encontró dnf ni apt-get"; exit 1
-            fi
-            sudo systemctl enable docker 2>/dev/null || true
-            sudo systemctl start docker
-
-            overlay_docker_compose_plugin() {
-              ARCH=$(uname -m)
-              case "$ARCH" in
-                x86_64) DL_ARCH=x86_64 ;;
-                aarch64|arm64) DL_ARCH=aarch64 ;;
-                *) echo "Arquitectura no soportada: $ARCH"; exit 1 ;;
-              esac
-              COMPOSE_VER="v2.35.1"
-              URL="https://github.com/docker/compose/releases/download/${COMPOSE_VER}/docker-compose-linux-${DL_ARCH}"
-              sudo mkdir -p /usr/local/lib/docker/cli-plugins
-              TMP="$(mktemp)"
-              curl -fsSL "$URL" -o "$TMP"
-              sudo install -m0755 "$TMP" /usr/local/lib/docker/cli-plugins/docker-compose
-              rm -f "$TMP"
-            }
-            overlay_docker_compose_plugin
-            sudo docker compose version
+            COMPOSE="/usr/local/bin/docker-compose"
 
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
@@ -237,7 +181,7 @@ jobs:
               echo "FRONT_PORT=${FRONT_PORT}"
             } > .env
 
-            echo "$DOCKERHUB_TOKEN" | sudo docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+            echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
 
-            sudo docker compose pull
-            sudo docker compose up -d
+            "$COMPOSE" pull
+            "$COMPOSE" up -d
